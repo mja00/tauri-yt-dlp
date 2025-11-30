@@ -7,13 +7,29 @@ pub fn get_ytdlp_path() -> Result<PathBuf, String> {
         if let Some(exe_dir) = exe_path.parent() {
             // In development, resources might be in src-tauri/resources
             // In production, resources are bundled with the app
-            let resource_paths = vec![
+            let mut resource_paths = vec![
+                // macOS .app bundle structure: Contents/MacOS/executable -> Contents/Resources/resources
+                exe_dir.join("../Resources/resources"),
+                // Windows/Linux: resources next to executable
                 exe_dir.join("resources"),
                 exe_dir.join("../resources"),
                 exe_dir.join("../../resources"),
                 // For development
                 PathBuf::from("src-tauri/resources"),
             ];
+
+            // On macOS, also try additional paths for .app bundles
+            #[cfg(target_os = "macos")]
+            {
+                // Check if we're in a .app bundle by looking for Contents/MacOS in the path
+                let exe_str = exe_dir.to_string_lossy();
+                if exe_str.contains("Contents/MacOS") {
+                    // We're in a .app bundle, resources are at Contents/Resources/resources
+                    resource_paths.insert(0, exe_dir.join("../../Resources/resources"));
+                }
+                // Also try the standard macOS resource location (relative to MacOS dir)
+                resource_paths.insert(0, exe_dir.join("../Resources/resources"));
+            }
 
             for resource_dir in resource_paths {
                 let bundled_path = get_platform_specific_path(&resource_dir);
@@ -63,12 +79,28 @@ pub fn get_bundled_ytdlp_dir() -> Result<PathBuf, String> {
     // Try multiple possible resource directory locations
     if let Ok(exe_path) = env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
-            let resource_paths = vec![
+            let mut resource_paths = vec![
+                // macOS .app bundle structure: Contents/MacOS/executable -> Contents/Resources/resources
+                exe_dir.join("../Resources/resources"),
+                // Windows/Linux: resources next to executable
                 exe_dir.join("resources"),
                 exe_dir.join("../resources"),
                 exe_dir.join("../../resources"),
                 PathBuf::from("src-tauri/resources"),
             ];
+
+            // On macOS, also try additional paths for .app bundles
+            #[cfg(target_os = "macos")]
+            {
+                // Check if we're in a .app bundle by looking for Contents/MacOS in the path
+                let exe_str = exe_dir.to_string_lossy();
+                if exe_str.contains("Contents/MacOS") {
+                    // We're in a .app bundle, resources are at Contents/Resources/resources
+                    resource_paths.insert(0, exe_dir.join("../../Resources/resources"));
+                }
+                // Also try the standard macOS resource location (relative to MacOS dir)
+                resource_paths.insert(0, exe_dir.join("../Resources/resources"));
+            }
 
             for resource_dir in resource_paths {
                 if resource_dir.exists() {

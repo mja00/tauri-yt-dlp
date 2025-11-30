@@ -1,7 +1,7 @@
 {
   "productName": "mac-ytdlp",
   "version": "1.0.0",
-  "identifier": "com.macytdlp.app",
+  "identifier": "fyi.mart.tauri-ytdlp",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
