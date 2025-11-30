@@ -39,3 +39,12 @@ src-tauri/resources/yt-dlp*
 Thumbs.db
 .DS_Store
 
+# SvelteKit
+.svelte-kit
+build
+
+# ESLint
+.eslintcache
+
+# TypeScript
+*.tsbuildinfo
