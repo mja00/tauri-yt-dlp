@@ -1,5 +1,5 @@
 {
-  "productName": "mac-ytdlp",
+  "productName": "YT-DLP GUI",
   "version": "1.0.0",
   "identifier": "fyi.mart.tauri-ytdlp",
   "build": {

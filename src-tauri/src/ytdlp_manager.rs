@@ -1,36 +1,47 @@
 use std::path::{Path, PathBuf};
 use std::env;
+use std::sync::OnceLock;
+
+// Cache the YT-DLP path to avoid repeated lookups
+static YTDLP_PATH_CACHE: OnceLock<Result<PathBuf, String>> = OnceLock::new();
 
 pub fn get_ytdlp_path() -> Result<PathBuf, String> {
+    // Use cached path if available
+    YTDLP_PATH_CACHE.get_or_init(|| find_ytdlp_path()).clone()
+}
+
+fn find_ytdlp_path() -> Result<PathBuf, String> {
     // First, try to find bundled YT-DLP in resources directory
     if let Ok(exe_path) = env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
-            // In development, resources might be in src-tauri/resources
-            // In production, resources are bundled with the app
-            let mut resource_paths = vec![
-                // macOS .app bundle structure: Contents/MacOS/executable -> Contents/Resources/resources
-                exe_dir.join("../Resources/resources"),
-                // Windows/Linux: resources next to executable
-                exe_dir.join("resources"),
-                exe_dir.join("../resources"),
-                exe_dir.join("../../resources"),
-                // For development
-                PathBuf::from("src-tauri/resources"),
-            ];
+            // Build resource paths in order of likelihood (most likely first)
+            let mut resource_paths = Vec::new();
 
-            // On macOS, also try additional paths for .app bundles
+            // On macOS, prioritize .app bundle paths
             #[cfg(target_os = "macos")]
             {
-                // Check if we're in a .app bundle by looking for Contents/MacOS in the path
                 let exe_str = exe_dir.to_string_lossy();
                 if exe_str.contains("Contents/MacOS") {
-                    // We're in a .app bundle, resources are at Contents/Resources/resources
-                    resource_paths.insert(0, exe_dir.join("../../Resources/resources"));
+                    // We're in a .app bundle - this is the most likely path
+                    resource_paths.push(exe_dir.join("../Resources/resources"));
+                } else {
+                    // Not in bundle, try standard macOS resource location
+                    resource_paths.push(exe_dir.join("../Resources/resources"));
                 }
-                // Also try the standard macOS resource location (relative to MacOS dir)
-                resource_paths.insert(0, exe_dir.join("../Resources/resources"));
             }
 
+            // Add other platform-specific paths
+            #[cfg(not(target_os = "macos"))]
+            {
+                resource_paths.push(exe_dir.join("resources"));
+                resource_paths.push(exe_dir.join("../resources"));
+            }
+
+            // Add fallback paths
+            resource_paths.push(exe_dir.join("../../resources"));
+            resource_paths.push(PathBuf::from("src-tauri/resources"));
+
+            // Check paths in order
             for resource_dir in resource_paths {
                 let bundled_path = get_platform_specific_path(&resource_dir);
                 if bundled_path.exists() {
@@ -41,15 +52,16 @@ pub fn get_ytdlp_path() -> Result<PathBuf, String> {
     }
 
     // Fallback to system YT-DLP if bundled version not found
+    // Only check system path if we didn't find bundled version (faster)
     let system_path = if cfg!(target_os = "windows") {
         "yt-dlp.exe"
     } else {
         "yt-dlp"
     };
 
-    // Check if system yt-dlp is available
-    if which::which(system_path).is_ok() {
-        return Ok(PathBuf::from(system_path));
+    // Check if system yt-dlp is available (this can be slow, so we do it last)
+    if let Ok(path) = which::which(system_path) {
+        return Ok(path);
     }
 
     Err("YT-DLP not found. Please ensure YT-DLP is installed or bundled with the application.".to_string())
