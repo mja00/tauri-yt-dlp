@@ -90,13 +90,13 @@ jobs:
               run: |
                   chmod +x src-tauri/resources/yt-dlp_* || true
 
+            - name: Build the app (macOS Intel)
+              if: matrix.os == 'macos-intel'
+              run: npm run tauri build -- --target x86_64-apple-darwin
+
             - name: Build the app
-              run: |
-                  if [ "${{ matrix.os }}" == "macos-intel" ]; then
-                    npm run tauri build -- --target x86_64-apple-darwin
-                  else
-                    npm run tauri build
-                  fi
+              if: matrix.os != 'macos-intel'
+              run: npm run tauri build
 
             - name: Upload Windows artifacts
               if: matrix.os == 'windows'
