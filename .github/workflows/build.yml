@@ -35,20 +35,6 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v4
 
-            - name: Install dependencies (Ubuntu)
-              if: matrix.os == 'linux'
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y libwebkit2gtk-4.1-dev \
-                    build-essential \
-                    curl \
-                    wget \
-                    file \
-                    libssl-dev \
-                    libgtk-3-dev \
-                    libayatana-appindicator3-dev \
-                    librsvg2-dev
-
             - name: Install jq (Unix)
               if: matrix.os != 'windows'
               run: |
@@ -79,6 +65,11 @@ jobs:
               with:
                   node-version: "20"
                   cache: "npm"
+                  
+            - name: install Rust stable
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
             - name: Install frontend dependencies
               run: npm ci
@@ -95,4 +86,3 @@ jobs:
                   releaseBody: 'See the assets to download'
                   releaseDraft: true
                   prerelease: false
-                  uploadWorkflowArtifacts: true
