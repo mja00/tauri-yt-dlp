@@ -106,4 +106,5 @@ jobs:
                   releaseName: ${{ github.event_name == 'push' && 'YT DLP GUI v__VERSION__' || '' }}
                   releaseBody: ${{ github.event_name == 'push' && 'See the assets to download' || '' }}
                   releaseDraft: ${{ github.event_name == 'push' }}
-                  prerelease: false
+                  prerelease: false'
+                  assetNamePattern: 'yt-dlp-gui-[platform]-[arch]-[bundle].[ext]'
