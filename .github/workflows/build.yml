@@ -93,6 +93,14 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: bash ./scripts/download-ytdlp.sh "${{ matrix.target }}"
 
+            - name: Filter resources (keep only platform-specific binary)
+              run: |
+                  if [ "${{ runner.os }}" == "Windows" ]; then
+                    powershell -ExecutionPolicy Bypass -File ./scripts/filter-resources.ps1 "${{ matrix.target }}"
+                  else
+                    bash ./scripts/filter-resources.sh "${{ matrix.target }}"
+                  fi
+
             - name: Make binaries executable (Unix)
               if: matrix.os != 'windows'
               run: |
