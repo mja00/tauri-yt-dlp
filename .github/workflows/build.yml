@@ -13,6 +13,9 @@ permissions:
 
 jobs:
     build:
+        permissions:
+            contents: write
+            packages: write
         strategy:
             fail-fast: false
             matrix:
@@ -97,10 +100,10 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                  tagName: app-v__VERSION__
+                  tagName: ${{ github.event_name == 'push' && 'app-v__VERSION__' || '' }}
                   projectPath: ./src-tauri
                   args: ${{ matrix.args }}
-                  releaseName: 'YT DLP GUI v__VERSION__'
-                  releaseBody: 'See the assets to download'
-                  releaseDraft: true
+                  releaseName: ${{ github.event_name == 'push' && 'YT DLP GUI v__VERSION__' || '' }}
+                  releaseBody: ${{ github.event_name == 'push' && 'See the assets to download' || '' }}
+                  releaseDraft: ${{ github.event_name == 'push' }}
                   prerelease: false
