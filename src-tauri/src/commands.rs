@@ -31,6 +31,11 @@ pub struct YtdlpVersionInfo {
 }
 
 #[tauri::command]
+pub fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[tauri::command]
 pub async fn get_video_info(url: String) -> Result<VideoInfo, String> {
     let ytdlp_path = ytdlp_manager::get_ytdlp_path()
         .await

@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const urlInput = document.getElementById('urlInput');
 const status = document.getElementById('status');
@@ -58,9 +59,20 @@ async function loadYtDlpVersion() {
     
     try {
         const versionInfo = await invoke('get_ytdlp_version');
+        
         const sourceLabel = versionInfo.source === 'path' ? 'System PATH' : 'Bundled';
         versionText.textContent = `YT-DLP Version: ${versionInfo.version} (${sourceLabel})`;
         versionSpinner.style.display = 'none';
+        
+        // Update window title with version
+        try {
+            const appWindow = getCurrentWindow();
+            const sourceLabelShort = versionInfo.source === 'path' ? 'System' : 'Bundled';
+			const appVersion = await invoke('get_app_version');
+            await appWindow.setTitle(`YT-DLP GUI - ${versionInfo.version} (${sourceLabelShort}) | App: ${appVersion}`);
+        } catch (titleError) {
+            console.error('Failed to update window title:', titleError);
+        }
     } catch (error) {
         console.error('Failed to get YT-DLP version:', error);
         versionText.textContent = 'YT-DLP Version: Unknown';

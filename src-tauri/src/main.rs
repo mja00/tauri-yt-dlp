@@ -19,7 +19,8 @@ fn main() {
             set_download_location,
             get_video_formats,
             download_video,
-            cancel_download
+            cancel_download,
+            get_app_version
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
