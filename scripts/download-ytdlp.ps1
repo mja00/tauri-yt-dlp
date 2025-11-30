@@ -7,7 +7,14 @@ New-Item -ItemType Directory -Force -Path $resourcesDir | Out-Null
 Write-Host "Fetching latest YT-DLP release information..."
 
 $releaseUrl = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
-$releaseInfo = Invoke-RestMethod -Uri $releaseUrl -Headers @{"User-Agent"="mac-ytdlp-downloader"}
+
+# Use GitHub token if provided (for CI/CD to avoid rate limits)
+$githubToken = $env:GITHUB_TOKEN
+$headers = @{"User-Agent"="mac-ytdlp-downloader"}
+if ($githubToken) {
+    $headers["Authorization"] = "token $githubToken"
+}
+$releaseInfo = Invoke-RestMethod -Uri $releaseUrl -Headers $headers
 
 Write-Host "Latest version: $($releaseInfo.tag_name)"
 

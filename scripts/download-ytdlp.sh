@@ -19,7 +19,14 @@ mkdir -p "$RESOURCES_DIR"
 echo "Fetching latest YT-DLP release information..."
 
 RELEASE_URL="https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
-RELEASE_INFO=$(curl -s -H "User-Agent: mac-ytdlp-downloader" "$RELEASE_URL")
+
+# Use GitHub token if provided (for CI/CD to avoid rate limits)
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+if [ -n "$GITHUB_TOKEN" ]; then
+    RELEASE_INFO=$(curl -s -H "User-Agent: mac-ytdlp-downloader" -H "Authorization: token $GITHUB_TOKEN" "$RELEASE_URL")
+else
+    RELEASE_INFO=$(curl -s -H "User-Agent: mac-ytdlp-downloader" "$RELEASE_URL")
+fi
 
 # Check if we got a valid response
 if [ -z "$RELEASE_INFO" ] || echo "$RELEASE_INFO" | jq -e '.message' > /dev/null 2>&1; then
