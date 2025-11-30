@@ -4,6 +4,7 @@
     import type { AppState, DownloadState, VideoState } from '$lib/types';
     import type { StatusType } from '$lib/types/status';
 
+    import ColoredLog from '$lib/components/ColoredLog.svelte';
     import { Alert, AlertDescription } from '$lib/components/ui/alert';
     import { Button } from '$lib/components/ui/button';
     import { Input } from '$lib/components/ui/input';
@@ -240,9 +241,9 @@
 
         {#if downloadState.showProgress}
             <div class="mb-4 w-full">
-                <code class="block w-full p-3 bg-background rounded border border-border text-xs text-muted-foreground font-mono whitespace-pre-wrap overflow-x-auto overflow-y-auto max-h-24 break-words">
-                    {downloadState.outputLines.join('\n')}
-                </code>
+                <div class="block w-full p-3 bg-background rounded border border-border text-xs text-muted-foreground overflow-x-auto overflow-y-auto max-h-24">
+                    <ColoredLog lines={downloadState.outputLines} />
+                </div>
             </div>
         {/if}
 
