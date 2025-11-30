@@ -12,8 +12,8 @@
     "windows": [
       {
         "title": "YT-DLP GUI",
-        "width": 800,
-        "height": 650,
+        "width": 900,
+        "height": 750,
         "resizable": true,
         "fullscreen": false
       }

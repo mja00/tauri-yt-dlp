@@ -77,29 +77,13 @@ jobs:
                   fi
 
             - name: Ensure all scripts are executable
-              run: |
-                chmod +x scripts/*.sh || true
-                chmod +x scripts/*.ps1 || true
-
-            - name: Download YT-DLP binaries (platform-specific) - Windows
-              if: matrix.os == 'windows'
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: powershell -ExecutionPolicy Bypass -File ./scripts/download-ytdlp.ps1 "${{ matrix.target }}"
-
-            - name: Download YT-DLP binaries (platform-specific) - Unix
               if: matrix.os != 'windows'
+              run: chmod +x scripts/*.sh
+
+            - name: Download YT-DLP binaries
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: bash ./scripts/download-ytdlp.sh "${{ matrix.target }}"
-
-            - name: Filter resources (keep only platform-specific binary)
-              run: |
-                  if [ "${{ runner.os }}" == "Windows" ]; then
-                    powershell -ExecutionPolicy Bypass -File ./scripts/filter-resources.ps1 "${{ matrix.target }}"
-                  else
-                    bash ./scripts/filter-resources.sh "${{ matrix.target }}"
-                  fi
+              run: bash ./scripts/download-ytdlp.sh
 
             - name: Make binaries executable (Unix)
               if: matrix.os != 'windows'

@@ -13,8 +13,7 @@ const cancelBtn = document.getElementById('cancelBtn');
 const qualitySelect = document.getElementById('qualitySelect');
 const qualitySpinner = document.getElementById('qualitySpinner');
 const progressContainer = document.getElementById('progressContainer');
-const progressBar = document.getElementById('progressBar');
-const progressText = document.getElementById('progressText');
+const progressOutput = document.getElementById('progressOutput');
 
 let debounceTimer;
 let currentVideoUrl = '';
@@ -248,50 +247,59 @@ browseLocationBtn.addEventListener('click', () => {
 let progressUnlisten = null;
 
 async function setupProgressListener() {
+    console.log('[DEBUG] Setting up progress listener...');
     if (progressUnlisten) {
+        console.log('[DEBUG] Cleaning up previous progress listener');
         await progressUnlisten();
     }
     
-    const unlistenProgress = await listen('download-progress', (event) => {
-        const percent = event.payload;
-        updateProgress(percent);
+    console.log('[DEBUG] Registering download-output listener');
+    const unlistenProgress = await listen('download-output', (event) => {
+        const line = event.payload;
+        console.log('[DEBUG] Received output line:', line);
+        updateProgress(line);
     });
     
+    console.log('[DEBUG] Registering download-error listener');
     const unlistenError = await listen('download-error', (event) => {
-        console.error('Download error:', event.payload);
+        console.error('[DEBUG] Download error event:', event.payload);
     });
     
     progressUnlisten = async () => {
         await unlistenProgress();
         await unlistenError();
     };
+    
+    console.log('[DEBUG] Progress listener setup complete');
 }
 
-let currentProgress = 0;
+let outputLines = []; // Store last 3 lines of output
 let downloadActive = false; // Track if download is actively running
+const MAX_OUTPUT_LINES = 3;
 
-function updateProgress(percent) {
+function updateProgress(line) {
     // Only update progress if download is active
     if (!downloadActive) {
         return;
     }
     
-    const clampedPercent = Math.min(100, Math.max(0, percent));
+    // Add new line to the array
+    outputLines.push(line);
     
-    // Only update if new progress is higher (handle out-of-order logs)
-    if (clampedPercent > currentProgress) {
-        currentProgress = clampedPercent;
-        progressBar.style.width = `${clampedPercent}%`;
-        progressText.textContent = `${clampedPercent.toFixed(1)}%`;
-        progressContainer.style.display = 'block';
+    // Keep only the last MAX_OUTPUT_LINES
+    if (outputLines.length > MAX_OUTPUT_LINES) {
+        outputLines.shift();
     }
+    
+    // Update the display
+    progressOutput.textContent = outputLines.join('\n');
+    progressContainer.style.display = 'block';
 }
 
 function resetProgress() {
-    currentProgress = 0;
+    outputLines = [];
     downloadActive = false;
-    progressBar.style.width = '0%';
-    progressText.textContent = '0%';
+    progressOutput.textContent = '';
     progressContainer.style.display = 'none';
 }
 
@@ -318,15 +326,19 @@ cancelBtn.addEventListener('click', async () => {
 
 // Download video
 downloadBtn.addEventListener('click', async () => {
+    console.log('[DEBUG] Download button clicked');
+    
     if (!currentVideoUrl) {
+        console.warn('[DEBUG] No video URL set');
         status.textContent = 'Please enter a video URL first';
         status.className = 'min-h-5 mb-4 text-sm text-center text-error';
         return;
     }
     
+    console.log('[DEBUG] Starting download for URL:', currentVideoUrl);
+    
     // Fully reset progress state before starting new download
     resetProgress();
-    currentProgress = 0;
     downloadActive = true; // Mark download as active
     
     downloadInProgress = true;
@@ -335,28 +347,34 @@ downloadBtn.addEventListener('click', async () => {
     cancelBtn.style.display = 'block';
     status.textContent = 'Downloading video...';
     status.className = 'min-h-5 mb-4 text-sm text-center text-primary';
+    
+    console.log('[DEBUG] Setting up progress listener...');
     await setupProgressListener();
+    console.log('[DEBUG] Progress listener set up');
     
     try {
         // Pass "best" explicitly when best is selected, otherwise pass the format ID
         const selectedQuality = qualitySelect.value === 'best' ? 'best' : qualitySelect.value;
+        console.log('[DEBUG] Selected quality:', selectedQuality);
+        console.log('[DEBUG] Invoking download_video command...');
+        
         const result = await invoke('download_video', { 
             url: currentVideoUrl,
             quality: selectedQuality
         });
+        
+        console.log('[DEBUG] Download completed:', result);
         status.textContent = result;
         status.className = 'min-h-5 mb-4 text-sm text-center text-success';
         downloadBtn.textContent = 'Download Video';
         cancelBtn.style.display = 'none';
-        // Ensure 100% is shown (backend should emit this, but set it here too)
-        downloadActive = false; // Stop accepting progress updates
-        currentProgress = 100;
-        progressBar.style.width = '100%';
-        progressText.textContent = '100.0%';
+        // Stop accepting progress updates
+        downloadActive = false;
         setTimeout(() => {
             resetProgress();
         }, 2000);
     } catch (error) {
+        console.error('[DEBUG] Download error:', error);
         if (error.includes('cancelled') || error.includes('Cancel')) {
             status.textContent = 'Download cancelled';
             status.className = 'min-h-5 mb-4 text-sm text-center text-dark-text-muted';
@@ -369,6 +387,7 @@ downloadBtn.addEventListener('click', async () => {
         downloadActive = false; // Stop accepting progress updates
         resetProgress();
     } finally {
+        console.log('[DEBUG] Download process finished, cleaning up...');
         downloadBtn.disabled = false;
         downloadInProgress = false;
         downloadActive = false; // Ensure download is marked as inactive
@@ -376,6 +395,7 @@ downloadBtn.addEventListener('click', async () => {
             await progressUnlisten();
             progressUnlisten = null;
         }
+        console.log('[DEBUG] Cleanup complete');
     }
 });
 

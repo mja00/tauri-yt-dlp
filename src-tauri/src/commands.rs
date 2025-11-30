@@ -232,10 +232,28 @@ pub async fn cancel_download() -> Result<(), String> {
 
 #[tauri::command]
 pub async fn download_video(url: String, quality: Option<String>, window: tauri::Window) -> Result<String, String> {
-    let ytdlp_path = ytdlp_manager::get_ytdlp_path()
-        .map_err(|e| format!("Failed to get YT-DLP path: {}", e))?;
+    #[cfg(debug_assertions)]
+    eprintln!("[DEBUG] download_video called with url: {}, quality: {:?}", url, quality);
     
-    let download_dir = config::get_download_path()?;
+    let ytdlp_path = ytdlp_manager::get_ytdlp_path()
+        .map_err(|e| {
+            #[cfg(debug_assertions)]
+            eprintln!("[DEBUG] Failed to get YT-DLP path: {}", e);
+            format!("Failed to get YT-DLP path: {}", e)
+        })?;
+    
+    #[cfg(debug_assertions)]
+    eprintln!("[DEBUG] YT-DLP path: {:?}", ytdlp_path);
+    
+    let download_dir = config::get_download_path()
+        .map_err(|e| {
+            #[cfg(debug_assertions)]
+            eprintln!("[DEBUG] Failed to get download path: {}", e);
+            e
+        })?;
+    
+    #[cfg(debug_assertions)]
+    eprintln!("[DEBUG] Download directory: {:?}", download_dir);
     
     let mut cmd = tokio::process::Command::new(&ytdlp_path);
     cmd.arg("--output")
@@ -262,8 +280,18 @@ pub async fn download_video(url: String, quality: Option<String>, window: tauri:
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
     
+    #[cfg(debug_assertions)]
+    eprintln!("[DEBUG] Executing YT-DLP command...");
+    
     let mut child = cmd.spawn()
-        .map_err(|e| format!("Failed to execute YT-DLP: {}", e))?;
+        .map_err(|e| {
+            #[cfg(debug_assertions)]
+            eprintln!("[DEBUG] Failed to spawn YT-DLP process: {}", e);
+            format!("Failed to execute YT-DLP: {}", e)
+        })?;
+    
+    #[cfg(debug_assertions)]
+    eprintln!("[DEBUG] YT-DLP process spawned successfully");
     
     // Create cancellation channel
     let (cancel_tx, mut cancel_rx) = oneshot::channel::<()>();
@@ -281,58 +309,56 @@ pub async fn download_video(url: String, quality: Option<String>, window: tauri:
     let mut stdout_lines = stdout_reader.lines();
     let mut stderr_lines = stderr_reader.lines();
     
-    // Parse progress from YT-DLP output
-    // Multiple possible formats:
-    // [download]  45.2% of 123.45MiB at 1.23MiB/s ETA 00:45
-    // [download] 100% of 123.45MiB in 00:30
-    // [download] Downloading item 1 of 2
-    let progress_regex = regex::Regex::new(r"\[download\]\s+(\d+\.?\d*)%").unwrap();
-    
+    // Capture console output from YT-DLP
     // Create a cancellation channel for the progress task
     let (progress_cancel_tx, mut progress_cancel_rx) = oneshot::channel::<()>();
     
     let window_clone = window.clone();
     let progress_task = tokio::spawn(async move {
-        let mut last_progress = 0.0f64;
         loop {
             tokio::select! {
                 _ = &mut progress_cancel_rx => {
-                    // Cancellation requested - stop processing progress
+                    // Cancellation requested - stop processing output
                     break;
                 }
                 result = stdout_lines.next_line() => {
                     match result {
                         Ok(Some(line)) => {
-                            if let Some(captures) = progress_regex.captures(&line) {
-                                if let Ok(percent) = captures[1].parse::<f64>() {
-                                    // Only emit if progress increased (handle out-of-order)
-                                    if percent > last_progress {
-                                        last_progress = percent;
-                                        let _ = window_clone.emit("download-progress", percent);
-                                    }
-                                }
-                            }
+                            #[cfg(debug_assertions)]
+                            eprintln!("[DEBUG] YT-DLP stdout: {}", line);
+                            // Emit the line to frontend
+                            let _ = window_clone.emit("download-output", line);
                         }
-                        Ok(None) => break,
-                        Err(_) => break,
+                        Ok(None) => {
+                            #[cfg(debug_assertions)]
+                            eprintln!("[DEBUG] stdout stream ended");
+                            break;
+                        }
+                        Err(e) => {
+                            #[cfg(debug_assertions)]
+                            eprintln!("[DEBUG] stdout read error: {:?}", e);
+                            break;
+                        }
                     }
                 }
                 result = stderr_lines.next_line() => {
                     match result {
                         Ok(Some(line)) => {
-                            // Progress can be in stderr
-                            if let Some(captures) = progress_regex.captures(&line) {
-                                if let Ok(percent) = captures[1].parse::<f64>() {
-                                    // Only emit if progress increased (handle out-of-order)
-                                    if percent > last_progress {
-                                        last_progress = percent;
-                                        let _ = window_clone.emit("download-progress", percent);
-                                    }
-                                }
-                            }
+                            #[cfg(debug_assertions)]
+                            eprintln!("[DEBUG] YT-DLP stderr: {}", line);
+                            // Emit the line to frontend (YT-DLP often uses stderr for progress)
+                            let _ = window_clone.emit("download-output", line);
                         }
-                        Ok(None) => break,
-                        Err(_) => break,
+                        Ok(None) => {
+                            #[cfg(debug_assertions)]
+                            eprintln!("[DEBUG] stderr stream ended");
+                            break;
+                        }
+                        Err(e) => {
+                            #[cfg(debug_assertions)]
+                            eprintln!("[DEBUG] stderr read error: {:?}", e);
+                            break;
+                        }
                     }
                 }
             }
@@ -374,8 +400,8 @@ pub async fn download_video(url: String, quality: Option<String>, window: tauri:
         return Err("Download failed".to_string());
     }
     
-    // Emit 100% progress to ensure UI shows completion
-    let _ = window.emit("download-progress", 100.0f64);
+    // Emit completion message
+    let _ = window.emit("download-output", "Download completed successfully".to_string());
     
     Ok(format!("Download completed to: {}", download_dir.to_string_lossy()))
 }

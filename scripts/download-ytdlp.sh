@@ -76,27 +76,15 @@ find_and_download() {
     fi
 }
 
-# Check if a platform filter is provided
-PLATFORM_FILTER="${1:-all}"
-
 # Download Windows binary
-if [ "$PLATFORM_FILTER" = "all" ] || [ "$PLATFORM_FILTER" = "windows" ] || [ "$PLATFORM_FILTER" = "x86_64-pc-windows-msvc" ]; then
-    find_and_download "yt-dlp.exe" "yt-dlp.exe"
-fi
+find_and_download "yt-dlp.exe" "yt-dlp.exe"
 
 # Download macOS binary (universal - works for both Intel and Apple Silicon)
-if [ "$PLATFORM_FILTER" = "all" ] || [ "$PLATFORM_FILTER" = "macos" ] || [ "$PLATFORM_FILTER" = "aarch64-apple-darwin" ] || [ "$PLATFORM_FILTER" = "x86_64-apple-darwin" ]; then
-    find_and_download "macos" "yt-dlp_macos" "yt-dlp_macos"
-fi
+find_and_download "macos" "yt-dlp_macos" "yt-dlp_macos"
 
 # Download Linux binaries  
-if [ "$PLATFORM_FILTER" = "all" ] || [ "$PLATFORM_FILTER" = "linux" ] || [ "$PLATFORM_FILTER" = "x86_64-unknown-linux-gnu" ]; then
-    find_and_download "linux" "yt-dlp_linux" "yt-dlp_linux"
-fi
-
-if [ "$PLATFORM_FILTER" = "all" ] || [ "$PLATFORM_FILTER" = "linux-arm64" ] || [ "$PLATFORM_FILTER" = "aarch64-unknown-linux-gnu" ]; then
-    find_and_download "linux.*arm64" "linux.*aarch64" "yt-dlp_linux_arm64"
-fi
+find_and_download "linux" "yt-dlp_linux" "yt-dlp_linux"
+find_and_download "linux.*arm64" "linux.*aarch64" "yt-dlp_linux_arm64"
 
 echo ""
 echo "All binaries downloaded to $RESOURCES_DIR"
