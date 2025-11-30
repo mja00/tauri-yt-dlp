@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { open } from '@tauri-apps/plugin-dialog';
 
 const urlInput = document.getElementById('urlInput');
 const status = document.getElementById('status');
@@ -10,13 +11,12 @@ const versionText = document.getElementById('versionText');
 const versionSpinner = document.getElementById('versionSpinner');
 const downloadSection = document.getElementById('downloadSection');
 const downloadLocation = document.getElementById('downloadLocation');
-const browseLocationBtn = document.getElementById('browseLocation');
-const downloadBtn = document.getElementById('downloadBtn');
-const cancelBtn = document.getElementById('cancelBtn');
 const qualitySelect = document.getElementById('qualitySelect');
 const qualitySpinner = document.getElementById('qualitySpinner');
 const progressContainer = document.getElementById('progressContainer');
 const progressOutput = document.getElementById('progressOutput');
+const downloadBtn = document.getElementById('downloadBtn');
+const cancelBtn = document.getElementById('cancelBtn');
 
 let debounceTimer;
 let currentVideoUrl = '';
@@ -257,12 +257,29 @@ downloadLocation.addEventListener('change', async () => {
     }
 });
 
-// Browse button - for now, just make the input editable
-browseLocationBtn.addEventListener('click', () => {
-    downloadLocation.readOnly = false;
-    downloadLocation.focus();
-    downloadLocation.select();
-});
+// Browse button - open folder dialog
+async function handleBrowseLocation() {
+    try {
+        const selected = await open({
+            directory: true,
+            multiple: false,
+            defaultPath: downloadLocation.value || undefined,
+        });
+        
+        if (selected && typeof selected === 'string') {
+            downloadLocation.value = selected;
+            // Trigger change event to save the location
+            downloadLocation.dispatchEvent(new Event('change'));
+        }
+    } catch (error) {
+        console.error('Failed to open folder dialog:', error);
+        status.textContent = `Error: ${error}`;
+        status.className = 'min-h-5 mb-4 text-sm text-center text-error';
+    }
+}
+
+// Make function globally accessible
+window.handleBrowseLocation = handleBrowseLocation;
 
 // Setup progress listener
 let progressUnlisten = null;
@@ -327,7 +344,7 @@ function resetProgress() {
 let downloadInProgress = false;
 
 // Cancel download
-cancelBtn.addEventListener('click', async () => {
+async function handleCancelDownload() {
     if (downloadInProgress) {
         try {
             downloadActive = false; // Stop accepting progress updates
@@ -343,10 +360,13 @@ cancelBtn.addEventListener('click', async () => {
             console.error('Failed to cancel download:', error);
         }
     }
-});
+}
+
+// Make function globally accessible
+window.handleCancelDownload = handleCancelDownload;
 
 // Download video
-downloadBtn.addEventListener('click', async () => {
+async function handleDownloadVideo() {
     console.log('[DEBUG] Download button clicked');
     
     if (!currentVideoUrl) {
@@ -418,7 +438,10 @@ downloadBtn.addEventListener('click', async () => {
         }
         console.log('[DEBUG] Cleanup complete');
     }
-});
+}
+
+// Make function globally accessible
+window.handleDownloadVideo = handleDownloadVideo;
 
 // Initialize
 loadYtDlpVersion();

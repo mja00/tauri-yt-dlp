@@ -44,15 +44,15 @@
                         readonly
                         placeholder="Enter or browse for download folder path..."
                     />
-                    <button id="browseLocation" class="px-5 py-2.5 bg-primary text-white border-none rounded-lg text-sm font-medium cursor-pointer transition-colors duration-200 whitespace-nowrap hover:bg-primary-dark">Browse</button>
+                    <button id="browseLocation" onclick="handleBrowseLocation()" class="px-5 py-2.5 bg-primary text-white border-none rounded-lg text-sm font-medium cursor-pointer transition-colors duration-200 whitespace-nowrap hover:bg-primary-dark">Browse</button>
                 </div>
             </div>
             <div id="progressContainer" class="mb-4" style="display: none;">
                 <code id="progressOutput" class="block w-full p-3 bg-dark-bg rounded border border-dark-border text-xs text-dark-text-muted font-mono whitespace-pre-wrap overflow-auto max-h-24"></code>
             </div>
             <div class="flex gap-2.5">
-                <button id="downloadBtn" class="flex-1 py-3.5 px-5 bg-[#27ae60] text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-colors duration-200 hover:bg-[#229954] disabled:bg-[#95a5a6] disabled:cursor-not-allowed">Download Video</button>
-                <button id="cancelBtn" class="flex-1 py-3.5 px-5 bg-[#e74c3c] text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-colors duration-200 hover:bg-[#c0392b]" style="display: none;">Cancel Download</button>
+                <button id="downloadBtn" onclick="handleDownloadVideo()" class="flex-1 py-3.5 px-5 bg-[#27ae60] text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-colors duration-200 hover:bg-[#229954] disabled:bg-[#95a5a6] disabled:cursor-not-allowed">Download Video</button>
+                <button id="cancelBtn" onclick="handleCancelDownload()" class="flex-1 py-3.5 px-5 bg-[#e74c3c] text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-colors duration-200 hover:bg-[#c0392b]" style="display: none;">Cancel Download</button>
             </div>
         </div>
         <div id="ytdlpVersion" class="text-xs text-dark-text-placeholder text-center mt-4 pt-4 border-t border-dark-border flex items-center justify-center gap-2">
