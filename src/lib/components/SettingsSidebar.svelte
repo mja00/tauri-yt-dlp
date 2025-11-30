@@ -1,11 +1,11 @@
 <script lang="ts">
     import { onMount } from 'svelte';
 
-    import Button from './Button.svelte';
-    import StatusMessage from './StatusMessage.svelte';
-
     import type { StatusType } from '$lib/types/status';
 
+    import { Alert, AlertDescription } from '$lib/components/ui/alert';
+    import { Button } from '$lib/components/ui/button';
+    import { Input } from '$lib/components/ui/input';
     import { appStore } from '$lib/stores/appStore';
     import { settingsStore } from '$lib/stores/settingsStore';
     import { openFolderDialog } from '$lib/utils/tauri';
@@ -61,6 +61,11 @@
     		handleClose();
     	}
     }
+
+    function getAlertVariant(): 'default' | 'destructive' {
+    	if (saveStatusType === 'error') { return 'destructive'; }
+    	return 'default';
+    }
 </script>
 
 {#if settingsOpen}
@@ -76,16 +81,16 @@
 
     <!-- Sidebar -->
     <aside
-        class="fixed right-0 top-0 h-full w-96 bg-dark-card border-l border-dark-border z-50 shadow-2xl transform transition-transform duration-300 ease-in-out"
+        class="fixed right-0 top-0 h-full w-96 bg-card border-l border-border z-50 shadow-2xl transform transition-transform duration-300 ease-in-out"
         class:translate-x-0={settingsOpen}
         class:translate-x-full={!settingsOpen}
     >
         <div class="p-6 h-full flex flex-col">
             <!-- Header -->
             <div class="flex items-center justify-between mb-6">
-                <h2 class="text-xl font-semibold text-dark-text">Settings</h2>
+                <h2 class="text-xl font-semibold text-foreground">Settings</h2>
                 <button
-                    class="text-dark-text-muted hover:text-dark-text transition-colors"
+                    class="text-muted-foreground hover:text-foreground transition-colors"
                     on:click={handleClose}
                     aria-label="Close settings"
                 >
@@ -98,16 +103,16 @@
             <!-- Content -->
             <div class="flex-1 overflow-y-auto">
                 <div class="mb-6">
-                    <label for="settingsDownloadLocation" class="block text-sm font-medium text-dark-text mb-2">
+                    <label for="settingsDownloadLocation" class="block text-sm font-medium text-foreground mb-2">
                         Download Location:
                     </label>
                     <div class="flex gap-2.5">
-                        <input
+                        <Input
                             id="settingsDownloadLocation"
                             type="text"
-                            value={downloadLocation}
-                            on:input={e => settingsStore.setLocation((e.target as HTMLInputElement).value)}
+                            bind:value={downloadLocation}
                             on:change={async () => {
+                            	settingsStore.setLocation(downloadLocation);
                             	if (downloadLocation.trim()) {
                             		const success = await settingsStore.save(downloadLocation.trim());
                             		if (success) {
@@ -126,14 +131,20 @@
                             		}
                             	}
                             }}
-                            class="flex-1 px-3.5 py-2.5 text-sm border-2 border-dark-border rounded-lg bg-dark-bg text-dark-text cursor-text placeholder:text-dark-text-placeholder focus:border-primary focus:ring-4 focus:ring-primary/20 outline-none"
+                            class="flex-1"
                             placeholder="Enter or browse for download folder path..."
                         />
-                        <Button onClick={handleBrowse} size="sm">
+                        <Button onclick={handleBrowse} size="sm">
                             Browse
                         </Button>
                     </div>
-                    <StatusMessage status={saveStatus} type={saveStatusType} />
+                    {#if saveStatus}
+                        <Alert variant={getAlertVariant()} class="mt-2">
+                            <AlertDescription>
+                                {saveStatus}
+                            </AlertDescription>
+                        </Alert>
+                    {/if}
                 </div>
             </div>
         </div>

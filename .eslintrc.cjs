@@ -44,6 +44,7 @@ module.exports = {
 		'node_modules/',
 		'*.config.js',
 		'*.config.cjs',
+		'src/lib/components/ui/**',
 	],
 };
 
