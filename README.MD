@@ -2,6 +2,8 @@
 
 A native cross-platform desktop application built with Tauri that provides a simple GUI for YT-DLP. The app automatically fetches and displays video information when you enter a YouTube URL.
 
+## Note: This project is meant to be used personally by myself and a few friends. I provide no support for this project and will only update it when needed.
+
 ## Features
 
 - 🎯 Simple, clean interface
