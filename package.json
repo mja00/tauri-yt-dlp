@@ -1,6 +1,6 @@
 {
   "name": "mac-ytdlp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Cross-platform GUI application for YT-DLP",
   "type": "module",
   "scripts": {
