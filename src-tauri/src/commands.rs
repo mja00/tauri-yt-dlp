@@ -24,9 +24,16 @@ pub struct VideoFormat {
     pub quality_label: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct YtdlpVersionInfo {
+    pub version: String,
+    pub source: String, // "path" or "bundled"
+}
+
 #[tauri::command]
 pub async fn get_video_info(url: String) -> Result<VideoInfo, String> {
     let ytdlp_path = ytdlp_manager::get_ytdlp_path()
+        .await
         .map_err(|e| format!("Failed to get YT-DLP path: {}", e))?;
 
     let output = tokio::process::Command::new(&ytdlp_path)
@@ -61,9 +68,13 @@ pub async fn get_video_info(url: String) -> Result<VideoInfo, String> {
 }
 
 #[tauri::command]
-pub async fn get_ytdlp_version() -> Result<String, String> {
+pub async fn get_ytdlp_version() -> Result<YtdlpVersionInfo, String> {
     let ytdlp_path = ytdlp_manager::get_ytdlp_path()
+        .await
         .map_err(|e| format!("Failed to get YT-DLP path: {}", e))?;
+
+    // Check if the path is from system PATH or bundled
+    let source = ytdlp_manager::get_ytdlp_source(&ytdlp_path).await;
 
     let output = tokio::process::Command::new(&ytdlp_path)
         .arg("--version")
@@ -78,7 +89,10 @@ pub async fn get_ytdlp_version() -> Result<String, String> {
     let version = String::from_utf8(output.stdout)
         .map_err(|e| format!("Failed to parse version: {}", e))?;
 
-    Ok(version.trim().to_string())
+    Ok(YtdlpVersionInfo {
+        version: version.trim().to_string(),
+        source,
+    })
 }
 
 #[tauri::command]
@@ -119,6 +133,7 @@ pub async fn set_download_location(path: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn get_video_formats(url: String) -> Result<Vec<VideoFormat>, String> {
     let ytdlp_path = ytdlp_manager::get_ytdlp_path()
+        .await
         .map_err(|e| format!("Failed to get YT-DLP path: {}", e))?;
 
     // Use -J to get JSON with formats
@@ -160,6 +175,12 @@ pub async fn get_video_formats(url: String) -> Result<Vec<VideoFormat>, String> 
                 .as_str()
                 .unwrap_or("unknown")
                 .to_string();
+            
+            // Only show MP4 formats in the dropdown for QuickTime compatibility
+            // Skip all other formats (webm, mkv, etc.)
+            if ext != "mp4" {
+                continue;
+            }
             
             let resolution = if let Some(res) = format["resolution"].as_str() {
                 res.to_string()
@@ -203,8 +224,38 @@ pub async fn get_video_formats(url: String) -> Result<Vec<VideoFormat>, String> 
         }
     }
 
-    // Sort by resolution (best first) - prioritize video formats
-    formats.sort_by(|a, b| {
+    // Deduplicate formats based on resolution only
+    // Keep the format with the best quality (largest filesize) for each unique resolution
+    // yt-dlp will automatically pair the selected video with the best available audio
+    use std::collections::HashMap;
+    let mut format_map: HashMap<String, VideoFormat> = HashMap::new();
+    
+    for format in formats {
+        // Use resolution as the unique key
+        let key = format.resolution.clone();
+        
+        // If we haven't seen this resolution, add it
+        // If we have, keep the one with larger filesize (better quality)
+        match format_map.get_mut(&key) {
+            Some(existing) => {
+                // Compare filesizes - keep the larger one
+                let existing_size = existing.filesize.unwrap_or(0);
+                let new_size = format.filesize.unwrap_or(0);
+                if new_size > existing_size {
+                    *existing = format;
+                }
+            }
+            None => {
+                format_map.insert(key, format);
+            }
+        }
+    }
+    
+    // Convert back to vector
+    let mut deduped_formats: Vec<VideoFormat> = format_map.into_values().collect();
+    
+    // Sort by resolution (best first) - all formats are MP4 for QuickTime compatibility
+    deduped_formats.sort_by(|a, b| {
         // Extract numeric resolution for sorting
         let a_res: u32 = a.resolution.split('x').next()
             .and_then(|s| s.parse().ok())
@@ -215,7 +266,7 @@ pub async fn get_video_formats(url: String) -> Result<Vec<VideoFormat>, String> 
         b_res.cmp(&a_res)
     });
 
-    Ok(formats)
+    Ok(deduped_formats)
 }
 
 // Global state to store the cancel sender for cancellation
@@ -236,6 +287,7 @@ pub async fn download_video(url: String, quality: Option<String>, window: tauri:
     eprintln!("[DEBUG] download_video called with url: {}, quality: {:?}", url, quality);
     
     let ytdlp_path = ytdlp_manager::get_ytdlp_path()
+        .await
         .map_err(|e| {
             #[cfg(debug_assertions)]
             eprintln!("[DEBUG] Failed to get YT-DLP path: {}", e);
@@ -260,20 +312,35 @@ pub async fn download_video(url: String, quality: Option<String>, window: tauri:
         .arg(format!("{}/%(title)s.%(ext)s", download_dir.to_string_lossy()))
         .arg("--newline")
         .arg("--progress")
-        .arg("--no-warnings");
+        .arg("--no-warnings")
+        // Force MP4 output format for QuickTime compatibility
+        // YT-DLP will use native muxer for MP4 (no FFmpeg required)
+        .arg("--merge-output-format")
+        .arg("mp4");
     
     // Add quality selector if specified
+    // Format selectors only use MP4 formats that can be merged natively without FFmpeg
+    // YT-DLP's native muxer can merge MP4 video + MP4 audio streams
     if let Some(quality) = quality {
         if quality == "best" || quality == "worst" {
-            // Pass "best" or "worst" directly to YT-DLP
-            cmd.arg("-f").arg(quality);
+            // For best/worst, prefer H.264+AAC MP4 for QuickTime compatibility
+            // Only select formats that are already MP4 (no re-encoding needed)
+            // Format selector: prefer H.264 video + AAC audio in MP4, fallback to any MP4
+            let format_selector = if quality == "best" {
+                "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=mp4][acodec^=mp4a]/bestvideo[ext=mp4]+bestaudio[ext=mp4]/best[ext=mp4]"
+            } else {
+                "worstvideo[ext=mp4][vcodec^=avc1]+worstaudio[ext=mp4][acodec^=mp4a]/worstvideo[ext=mp4]+worstaudio[ext=mp4]/worst[ext=mp4]"
+            };
+            cmd.arg("-f").arg(format_selector);
         } else {
-            // Assume it's a format ID
-            cmd.arg("-f").arg(&quality);
+            // For specific format ID (resolution), pair it with best MP4 audio
+            // Only use MP4 formats to avoid needing FFmpeg
+            cmd.arg("-f").arg(format!("{}+bestaudio[ext=mp4]/best[ext=mp4]", quality));
         }
     } else {
-        // Default to best quality
-        cmd.arg("-f").arg("best");
+        // Default: prefer H.264+AAC MP4 for QuickTime compatibility
+        // Only select MP4 formats that can be merged natively
+        cmd.arg("-f").arg("bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=mp4][acodec^=mp4a]/bestvideo[ext=mp4]+bestaudio[ext=mp4]/best[ext=mp4]");
     }
     
     cmd.arg(&url)
@@ -304,10 +371,8 @@ pub async fn download_video(url: String, quality: Option<String>, window: tauri:
     let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
     
     use tokio::io::{AsyncBufReadExt, BufReader};
-    let stdout_reader = BufReader::new(stdout);
-    let stderr_reader = BufReader::new(stderr);
-    let mut stdout_lines = stdout_reader.lines();
-    let mut stderr_lines = stderr_reader.lines();
+    let mut stdout_reader = BufReader::new(stdout);
+    let mut stderr_reader = BufReader::new(stderr);
     
     // Capture console output from YT-DLP
     // Create a cancellation channel for the progress task
@@ -315,49 +380,78 @@ pub async fn download_video(url: String, quality: Option<String>, window: tauri:
     
     let window_clone = window.clone();
     let progress_task = tokio::spawn(async move {
+        let mut stdout_buf = Vec::new();
+        let mut stderr_buf = Vec::new();
+        
         loop {
             tokio::select! {
                 _ = &mut progress_cancel_rx => {
                     // Cancellation requested - stop processing output
                     break;
                 }
-                result = stdout_lines.next_line() => {
+                result = stdout_reader.read_until(b'\n', &mut stdout_buf) => {
                     match result {
-                        Ok(Some(line)) => {
-                            #[cfg(debug_assertions)]
-                            eprintln!("[DEBUG] YT-DLP stdout: {}", line);
-                            // Emit the line to frontend
-                            let _ = window_clone.emit("download-output", line);
-                        }
-                        Ok(None) => {
+                        Ok(0) => {
+                            // EOF
                             #[cfg(debug_assertions)]
                             eprintln!("[DEBUG] stdout stream ended");
                             break;
                         }
+                        Ok(_) => {
+                            // Convert bytes to string using lossy UTF-8 conversion
+                            // This handles progress indicators and special characters gracefully
+                            let line = String::from_utf8_lossy(&stdout_buf);
+                            let line = line.trim_end_matches('\n').trim_end_matches('\r');
+                            
+                            if !line.is_empty() {
+                                #[cfg(debug_assertions)]
+                                eprintln!("[DEBUG] YT-DLP stdout: {}", line);
+                                // Emit the line to frontend
+                                let _ = window_clone.emit("download-output", line.to_string());
+                            }
+                            
+                            stdout_buf.clear();
+                        }
                         Err(e) => {
                             #[cfg(debug_assertions)]
                             eprintln!("[DEBUG] stdout read error: {:?}", e);
-                            break;
+                            // Continue reading on errors - don't break the download
+                            if e.kind() != std::io::ErrorKind::Interrupted {
+                                break;
+                            }
                         }
                     }
                 }
-                result = stderr_lines.next_line() => {
+                result = stderr_reader.read_until(b'\n', &mut stderr_buf) => {
                     match result {
-                        Ok(Some(line)) => {
-                            #[cfg(debug_assertions)]
-                            eprintln!("[DEBUG] YT-DLP stderr: {}", line);
-                            // Emit the line to frontend (YT-DLP often uses stderr for progress)
-                            let _ = window_clone.emit("download-output", line);
-                        }
-                        Ok(None) => {
+                        Ok(0) => {
+                            // EOF
                             #[cfg(debug_assertions)]
                             eprintln!("[DEBUG] stderr stream ended");
                             break;
                         }
+                        Ok(_) => {
+                            // Convert bytes to string using lossy UTF-8 conversion
+                            // This handles progress indicators and special characters gracefully
+                            let line = String::from_utf8_lossy(&stderr_buf);
+                            let line = line.trim_end_matches('\n').trim_end_matches('\r');
+                            
+                            if !line.is_empty() {
+                                #[cfg(debug_assertions)]
+                                eprintln!("[DEBUG] YT-DLP stderr: {}", line);
+                                // Emit the line to frontend (YT-DLP often uses stderr for progress)
+                                let _ = window_clone.emit("download-output", line.to_string());
+                            }
+                            
+                            stderr_buf.clear();
+                        }
                         Err(e) => {
                             #[cfg(debug_assertions)]
                             eprintln!("[DEBUG] stderr read error: {:?}", e);
-                            break;
+                            // Continue reading on errors - don't break the download
+                            if e.kind() != std::io::ErrorKind::Interrupted {
+                                break;
+                            }
                         }
                     }
                 }

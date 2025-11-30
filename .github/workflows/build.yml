@@ -52,7 +52,8 @@ jobs:
                     libssl-dev \
                     libgtk-3-dev \
                     libayatana-appindicator3-dev \
-                    librsvg2-dev
+                    librsvg2-dev \
+                    p7zip-full
 
             - name: Install jq (Unix)
               if: matrix.os != 'windows'
@@ -137,12 +138,14 @@ jobs:
               run: |
                   # Sign the yt-dlp_macos binary with Developer ID certificate
                   # This is required for ARM Macs - all executables must be signed
+                  SIGNING_IDENTITY="${{ env.APPLE_SIGNING_IDENTITY }}"
+                  if [ "$SIGNING_IDENTITY" = "-" ] || [ -z "$SIGNING_IDENTITY" ]; then
+                    echo "No valid signing identity found, using ad-hoc signing for sidecar binaries"
+                    SIGNING_IDENTITY="-"
+                  fi
+                  
+                  # Sign yt-dlp_macos
                   if [ -f "src-tauri/resources/yt-dlp_macos" ]; then
-                    SIGNING_IDENTITY="${{ env.APPLE_SIGNING_IDENTITY }}"
-                    if [ "$SIGNING_IDENTITY" = "-" ] || [ -z "$SIGNING_IDENTITY" ]; then
-                      echo "No valid signing identity found, using ad-hoc signing for sidecar binary"
-                      SIGNING_IDENTITY="-"
-                    fi
                     echo "Signing yt-dlp_macos binary with $SIGNING_IDENTITY..."
                     if [ -f "src-tauri/entitlements.plist" ]; then
                       codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime --entitlements src-tauri/entitlements.plist src-tauri/resources/yt-dlp_macos

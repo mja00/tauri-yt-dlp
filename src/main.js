@@ -57,8 +57,9 @@ async function loadYtDlpVersion() {
     versionText.textContent = 'Loading version...';
     
     try {
-        const version = await invoke('get_ytdlp_version');
-        versionText.textContent = `YT-DLP Version: ${version}`;
+        const versionInfo = await invoke('get_ytdlp_version');
+        const sourceLabel = versionInfo.source === 'path' ? 'System PATH' : 'Bundled';
+        versionText.textContent = `YT-DLP Version: ${versionInfo.version} (${sourceLabel})`;
         versionSpinner.style.display = 'none';
     } catch (error) {
         console.error('Failed to get YT-DLP version:', error);

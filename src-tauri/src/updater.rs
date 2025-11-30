@@ -1,7 +1,18 @@
 use crate::ytdlp_manager;
 use std::fs;
+use std::sync::OnceLock;
+use std::time::SystemTime;
 
 const YTDLP_RELEASES_API: &str = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest";
+
+// Cache for latest version with timestamp
+struct CachedVersion {
+    version: String,
+    cached_at: SystemTime,
+}
+
+static LATEST_VERSION_CACHE: OnceLock<CachedVersion> = OnceLock::new();
+const CACHE_DURATION_SECONDS: u64 = 3600; // 1 hour
 
 #[derive(serde::Deserialize)]
 struct GitHubRelease {
@@ -23,7 +34,7 @@ pub async fn check_update_available() -> Result<bool, String> {
 }
 
 async fn get_current_version() -> Result<String, String> {
-    let ytdlp_path = ytdlp_manager::get_ytdlp_path()?;
+    let ytdlp_path = ytdlp_manager::get_ytdlp_path().await?;
     
     let output = tokio::process::Command::new(&ytdlp_path)
         .arg("--version")
@@ -41,7 +52,17 @@ async fn get_current_version() -> Result<String, String> {
     Ok(version.trim().to_string())
 }
 
-async fn get_latest_version() -> Result<String, String> {
+pub async fn get_latest_version() -> Result<String, String> {
+    // Check cache first
+    if let Some(cached) = LATEST_VERSION_CACHE.get() {
+        if let Ok(elapsed) = SystemTime::now().duration_since(cached.cached_at) {
+            if elapsed.as_secs() < CACHE_DURATION_SECONDS {
+                return Ok(cached.version.clone());
+            }
+        }
+    }
+
+    // Fetch from API
     let client = reqwest::Client::new();
     let response = client
         .get(YTDLP_RELEASES_API)
@@ -55,7 +76,101 @@ async fn get_latest_version() -> Result<String, String> {
         .await
         .map_err(|e| format!("Failed to parse release info: {}", e))?;
 
-    Ok(release.tag_name.trim_start_matches('v').to_string())
+    let version = release.tag_name.trim_start_matches('v').to_string();
+    
+    // Update cache
+    let _ = LATEST_VERSION_CACHE.set(CachedVersion {
+        version: version.clone(),
+        cached_at: SystemTime::now(),
+    });
+
+    Ok(version)
+}
+
+/// Compare two yt-dlp version strings
+/// Returns:
+/// - Ok(true) if version1 >= version2 (version1 is up to date or newer)
+/// - Ok(false) if version1 < version2 (version1 is outdated)
+/// - Err if versions cannot be compared
+pub fn compare_ytdlp_versions(version1: &str, version2: &str) -> Result<bool, String> {
+    // Handle nightly versions: nightly@YYYY.MM.DD.HHMMSS
+    let v1_is_nightly = version1.starts_with("nightly@");
+    let v2_is_nightly = version2.starts_with("nightly@");
+    
+    // Extract base version (YYYY.MM.DD or YYYY.MM.DD.HHMMSS)
+    let v1_base = if v1_is_nightly {
+        version1.strip_prefix("nightly@").unwrap_or(version1)
+    } else {
+        version1
+    };
+    
+    let v2_base = if v2_is_nightly {
+        version2.strip_prefix("nightly@").unwrap_or(version2)
+    } else {
+        version2
+    };
+    
+    // Parse version components
+    let v1_parts: Vec<&str> = v1_base.split('.').collect();
+    let v2_parts: Vec<&str> = v2_base.split('.').collect();
+    
+    // Compare year
+    let v1_year: u32 = v1_parts.get(0)
+        .and_then(|s| s.parse().ok())
+        .ok_or_else(|| format!("Invalid year in version: {}", version1))?;
+    let v2_year: u32 = v2_parts.get(0)
+        .and_then(|s| s.parse().ok())
+        .ok_or_else(|| format!("Invalid year in version: {}", version2))?;
+    
+    if v1_year != v2_year {
+        return Ok(v1_year >= v2_year);
+    }
+    
+    // Compare month
+    let v1_month: u32 = v1_parts.get(1)
+        .and_then(|s| s.parse().ok())
+        .ok_or_else(|| format!("Invalid month in version: {}", version1))?;
+    let v2_month: u32 = v2_parts.get(1)
+        .and_then(|s| s.parse().ok())
+        .ok_or_else(|| format!("Invalid month in version: {}", version2))?;
+    
+    if v1_month != v2_month {
+        return Ok(v1_month >= v2_month);
+    }
+    
+    // Compare day
+    let v1_day: u32 = v1_parts.get(2)
+        .and_then(|s| s.parse().ok())
+        .ok_or_else(|| format!("Invalid day in version: {}", version1))?;
+    let v2_day: u32 = v2_parts.get(2)
+        .and_then(|s| s.parse().ok())
+        .ok_or_else(|| format!("Invalid day in version: {}", version2))?;
+    
+    if v1_day != v2_day {
+        return Ok(v1_day >= v2_day);
+    }
+    
+    // If both are nightly, compare time component (HHMMSS)
+    if v1_is_nightly && v2_is_nightly {
+        let v1_time: u32 = v1_parts.get(3)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        let v2_time: u32 = v2_parts.get(3)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        return Ok(v1_time >= v2_time);
+    }
+    
+    // If one is nightly and one is stable, nightly is considered newer
+    if v1_is_nightly && !v2_is_nightly {
+        return Ok(true);
+    }
+    if !v1_is_nightly && v2_is_nightly {
+        return Ok(false);
+    }
+    
+    // Same date, both stable - consider equal
+    Ok(true)
 }
 
 pub async fn update_ytdlp() -> Result<String, String> {
