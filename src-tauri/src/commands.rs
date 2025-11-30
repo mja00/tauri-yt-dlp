@@ -31,6 +31,11 @@ pub struct YtdlpVersionInfo {
 }
 
 #[tauri::command]
+pub fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[tauri::command]
 pub async fn get_video_info(url: String) -> Result<VideoInfo, String> {
     let ytdlp_path = ytdlp_manager::get_ytdlp_path()
         .await
@@ -313,6 +318,8 @@ pub async fn download_video(url: String, quality: Option<String>, window: tauri:
         .arg("--newline")
         .arg("--progress")
         .arg("--no-warnings")
+        .arg("--color")  // Force color output even when not in TTY
+        .arg("always")   // Color policy: always output colors
         // Force MP4 output format for QuickTime compatibility
         // YT-DLP will use native muxer for MP4 (no FFmpeg required)
         .arg("--merge-output-format")

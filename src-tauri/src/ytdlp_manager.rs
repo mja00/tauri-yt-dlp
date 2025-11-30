@@ -159,6 +159,7 @@ pub fn get_bundled_ytdlp_dir() -> Result<PathBuf, String> {
     // Try multiple possible resource directory locations
     if let Ok(exe_path) = env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
+            #[allow(unused_mut)] // Only mutated on macOS
             let mut resource_paths = vec![
                 // macOS .app bundle structure: Contents/MacOS/executable -> Contents/Resources/resources
                 exe_dir.join("../Resources/resources"),

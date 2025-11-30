@@ -4,7 +4,10 @@
   "description": "Default capabilities for the application",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:window:allow-set-title",
+    "dialog:allow-open",
+    "dialog:default"
   ]
 }
 

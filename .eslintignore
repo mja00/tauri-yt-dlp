@@ -1,0 +1,8 @@
+node_modules/
+build/
+.svelte-kit/
+dist/
+*.config.js
+*.config.cjs
+package-lock.json
+

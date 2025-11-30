@@ -10,6 +10,7 @@ use commands::*;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_video_info,
             get_ytdlp_version,
@@ -19,7 +20,8 @@ fn main() {
             set_download_location,
             get_video_formats,
             download_video,
-            cancel_download
+            cancel_download,
+            get_app_version
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

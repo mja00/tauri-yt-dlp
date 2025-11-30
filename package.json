@@ -1,25 +1,50 @@
 {
   "name": "mac-ytdlp",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Cross-platform GUI application for YT-DLP",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "lint:check": "eslint . --max-warnings 0",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.0.0"
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-dialog": "^2.4.2",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.4.0",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@lucide/svelte": "^0.482.0",
+    "@nodecraft/eslint-config": "^46.0.0",
+    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/kit": "^2.49.0",
+    "@sveltejs/vite-plugin-svelte": "^6.2.1",
     "@tauri-apps/cli": "^2.0.0",
-    "vite": "^5.0.0",
-    "tailwindcss": "^3.4.0",
+    "@types/node": "^24.10.1",
+    "@typescript-eslint/eslint-plugin": "^8.48.0",
+    "@typescript-eslint/parser": "^8.48.0",
+    "autoprefixer": "^10.4.0",
+    "bits-ui": "^1.8.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-svelte": "^3.13.0",
     "postcss": "^8.4.0",
-    "autoprefixer": "^10.4.0"
+    "svelte": "^5.45.2",
+    "svelte-check": "^4.3.4",
+    "svelte-eslint-parser": "^1.4.0",
+    "tailwind-variants": "^0.2.1",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.1",
+    "vite-plugin-devtools-json": "^1.0.0"
   }
 }
-
