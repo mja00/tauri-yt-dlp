@@ -95,10 +95,78 @@ jobs:
             - name: Install frontend dependencies
               run: npm ci
 
+            - name: Import Apple Developer Certificate
+              if: matrix.os == 'macos' || matrix.os == 'macos-intel'
+              # Prevents keychain from locking automatically for 3600 seconds.
+              env:
+                  APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+                  APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+                  KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+              run: |
+                  if [ -z "$APPLE_CERTIFICATE" ]; then
+                    echo "Warning: APPLE_CERTIFICATE not set, skipping certificate import (will use ad-hoc signing)"
+                    exit 0
+                  fi
+                  echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+                  security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+                  security default-keychain -s build.keychain
+                  security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+                  security set-keychain-settings -t 3600 -u build.keychain
+                  security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+                  security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+                  security find-identity -v -p codesigning build.keychain
+
+            - name: Verify certificate and extract signing identity
+              if: matrix.os == 'macos' || matrix.os == 'macos-intel'
+              run: |
+                  if [ -z "${{ secrets.APPLE_CERTIFICATE }}" ]; then
+                    echo "APPLE_SIGNING_IDENTITY=-" >> $GITHUB_ENV
+                    echo "Using ad-hoc signing (no certificate provided)"
+                    exit 0
+                  fi
+                  CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application")
+                  if [ -z "$CERT_INFO" ]; then
+                    echo "Warning: No Developer ID Application certificate found, using ad-hoc signing"
+                    echo "APPLE_SIGNING_IDENTITY=-" >> $GITHUB_ENV
+                  else
+                    CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
+                    echo "APPLE_SIGNING_IDENTITY=$CERT_ID" >> $GITHUB_ENV
+                    echo "Certificate found: $CERT_ID"
+                  fi
+
+            - name: Sign macOS sidecar binaries
+              if: matrix.os == 'macos' || matrix.os == 'macos-intel'
+              run: |
+                  # Sign the yt-dlp_macos binary with Developer ID certificate
+                  # This is required for ARM Macs - all executables must be signed
+                  if [ -f "src-tauri/resources/yt-dlp_macos" ]; then
+                    SIGNING_IDENTITY="${{ env.APPLE_SIGNING_IDENTITY }}"
+                    if [ "$SIGNING_IDENTITY" = "-" ] || [ -z "$SIGNING_IDENTITY" ]; then
+                      echo "No valid signing identity found, using ad-hoc signing for sidecar binary"
+                      SIGNING_IDENTITY="-"
+                    fi
+                    echo "Signing yt-dlp_macos binary with $SIGNING_IDENTITY..."
+                    if [ -f "src-tauri/entitlements.plist" ]; then
+                      codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime --entitlements src-tauri/entitlements.plist src-tauri/resources/yt-dlp_macos
+                    else
+                      codesign --force --sign "$SIGNING_IDENTITY" --timestamp --options runtime src-tauri/resources/yt-dlp_macos
+                    fi
+                    codesign -vvv src-tauri/resources/yt-dlp_macos
+                    echo "yt-dlp_macos signed successfully"
+                  else
+                    echo "Warning: yt-dlp_macos not found, skipping signing"
+                  fi
+
             - name: Build the app with Tauri
               uses: tauri-apps/tauri-action@v0.6.0
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  APPLE_ID: ${{ secrets.APPLE_ID }}
+                  APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+                  APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+                  APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+                  APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+                  APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY || (matrix.os == 'macos' || matrix.os == 'macos-intel') && '-' || '' }}
               with:
                   tagName: ${{ github.event_name == 'push' && 'app-v__VERSION__' || '' }}
                   projectPath: ./src-tauri
@@ -107,4 +175,4 @@ jobs:
                   releaseBody: ${{ github.event_name == 'push' && 'See the assets to download' || '' }}
                   releaseDraft: ${{ github.event_name == 'push' }}
                   prerelease: false
-                  assetNamePattern: 'yt-dlp-gui-[platform]-[arch]-[bundle].[ext]'
+                  assetNamePattern: 'yt-dlp-gui-[platform]-[arch].[ext]'
