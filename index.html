@@ -19,8 +19,8 @@
             />
         </div>
         <div id="status" class="min-h-5 mb-4 text-sm text-center text-dark-text-muted"></div>
-        <div id="videoInfo" class="bg-dark-bg rounded-lg p-4 mb-4 min-h-[50px] flex items-center justify-center border border-dark-border">
-            <h2 class="text-dark-text text-base font-medium text-center break-words leading-snug"></h2>
+        <div id="videoInfo" class="bg-dark-bg rounded-lg p-4 mb-4 min-h-[50px] flex items-center justify-center border border-dark-border text-dark-text-placeholder italic">
+            <h2 class="text-base font-medium text-center break-words leading-snug">Video title will appear here...</h2>
         </div>
         <div id="downloadSection" class="mt-4 pt-4 border-t border-dark-border" style="display: none;">
             <div class="mb-4">
@@ -55,7 +55,10 @@
                 <button id="cancelBtn" class="flex-1 py-3.5 px-5 bg-[#e74c3c] text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-colors duration-200 hover:bg-[#c0392b]" style="display: none;">Cancel Download</button>
             </div>
         </div>
-        <div id="ytdlpVersion" class="text-xs text-dark-text-placeholder text-center mt-4 pt-4 border-t border-dark-border"></div>
+        <div id="ytdlpVersion" class="text-xs text-dark-text-placeholder text-center mt-4 pt-4 border-t border-dark-border flex items-center justify-center gap-2">
+            <div id="versionSpinner" class="spinner w-3 h-3 border-2 border-dark-border border-t-primary rounded-full"></div>
+            <span id="versionText"></span>
+        </div>
     </div>
     <script type="module" src="/src/main.js"></script>
 </body>

@@ -5,6 +5,8 @@ const urlInput = document.getElementById('urlInput');
 const status = document.getElementById('status');
 const videoInfo = document.getElementById('videoInfo');
 const ytdlpVersion = document.getElementById('ytdlpVersion');
+const versionText = document.getElementById('versionText');
+const versionSpinner = document.getElementById('versionSpinner');
 const downloadSection = document.getElementById('downloadSection');
 const downloadLocation = document.getElementById('downloadLocation');
 const browseLocationBtn = document.getElementById('browseLocation');
@@ -50,12 +52,18 @@ function isValidYouTubeUrl(url) {
 
 // Load YT-DLP version on startup
 async function loadYtDlpVersion() {
+    // Show spinner initially
+    versionSpinner.style.display = 'block';
+    versionText.textContent = 'Loading version...';
+    
     try {
         const version = await invoke('get_ytdlp_version');
-        ytdlpVersion.textContent = `YT-DLP Version: ${version}`;
+        versionText.textContent = `YT-DLP Version: ${version}`;
+        versionSpinner.style.display = 'none';
     } catch (error) {
         console.error('Failed to get YT-DLP version:', error);
-        ytdlpVersion.textContent = 'YT-DLP Version: Unknown';
+        versionText.textContent = 'YT-DLP Version: Unknown';
+        versionSpinner.style.display = 'none';
     }
 }
 
@@ -71,7 +79,7 @@ async function fetchVideoInfo(url) {
     if (!trimmedUrl) {
         status.textContent = '';
         status.className = 'min-h-5 mb-4 text-sm text-center text-dark-text-muted';
-        videoInfo.innerHTML = '';
+        videoInfo.innerHTML = '<h2 class="text-base font-medium text-center break-words leading-snug">Video title will appear here...</h2>';
         videoInfo.className = 'bg-dark-bg rounded-lg p-4 mb-4 min-h-[50px] flex items-center justify-center border border-dark-border text-dark-text-placeholder italic';
         lastFetchedUrl = '';
         currentVideoUrl = '';
@@ -86,7 +94,7 @@ async function fetchVideoInfo(url) {
     if (!isValidYouTubeUrl(trimmedUrl)) {
         status.textContent = 'Invalid YouTube URL. Please enter a valid YouTube video URL.';
         status.className = 'min-h-5 mb-4 text-sm text-center text-error';
-        videoInfo.innerHTML = '';
+        videoInfo.innerHTML = '<h2 class="text-base font-medium text-center break-words leading-snug">Video title will appear here...</h2>';
         videoInfo.className = 'bg-dark-bg rounded-lg p-4 mb-4 min-h-[50px] flex items-center justify-center border border-dark-border text-dark-text-placeholder italic';
         downloadSection.style.display = 'none';
         currentVideoUrl = '';
@@ -128,7 +136,7 @@ async function fetchVideoInfo(url) {
     } catch (error) {
         status.textContent = `Error: ${error}`;
         status.className = 'min-h-5 mb-4 text-sm text-center text-error';
-        videoInfo.innerHTML = '';
+        videoInfo.innerHTML = '<h2 class="text-base font-medium text-center break-words leading-snug">Video title will appear here...</h2>';
         videoInfo.className = 'bg-dark-bg rounded-lg p-4 mb-4 min-h-[50px] flex items-center justify-center border border-dark-border text-dark-text-placeholder italic';
         downloadSection.style.display = 'none';
         currentVideoUrl = '';
