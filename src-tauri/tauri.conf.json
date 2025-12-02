@@ -1,6 +1,6 @@
 {
   "productName": "YT-DLP GUI",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "identifier": "fyi.mart.tauri-ytdlp",
   "build": {
     "beforeDevCommand": "npm run dev",
