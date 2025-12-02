@@ -23,14 +23,9 @@ async fn find_ytdlp_path() -> Result<PathBuf, String> {
 
     // Check if system yt-dlp is available
     if let Ok(path) = which::which(system_path) {
-        // Verify system version is up to date
-        if let Ok(is_up_to_date) = check_system_ytdlp_version(&path).await {
-            if is_up_to_date {
-                return Ok(path);
-            }
-            // System version is outdated, fall through to bundled
-        }
-        // If version check fails, fall through to bundled as well
+        // If system yt-dlp is found in PATH, use it regardless of version check result
+        // The version check is informational only - we prefer system PATH over bundled
+        return Ok(path);
     }
 
     // Fallback to bundled YT-DLP in resources directory

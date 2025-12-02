@@ -40,6 +40,7 @@ Thumbs.db
 .DS_Store
 
 # SvelteKit
+!.svelte-kit/tsconfig.json
 .svelte-kit
 build
 
